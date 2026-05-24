@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Heart, TrendingUp, Users } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Heart, TrendingUp, Users, CheckCircle, XCircle, Phone } from 'lucide-react';
+import { toast } from 'sonner';
 import api from '@/lib/api';
 import type { Donation } from '@/lib/types';
 
@@ -15,23 +17,38 @@ export default function AdminDonsPage() {
   const [donations, setDonations] = useState<Donation[]>([]);
   const [stats, setStats] = useState({ total: 0, confirmed: 0, donors: 0 });
 
-  useEffect(() => {
-    api.get('/api/donations/all').then(r => {
+  const fetchData = () => {
+    api.get('/api/donations').then(r => {
       const data = r.data.data as Donation[];
       setDonations(data);
       const confirmed = data.filter(d => d.status === 'CONFIRMED');
       setStats({
-        total: data.reduce((s, d) => s + d.amount, 0),
-        confirmed: confirmed.reduce((s, d) => s + d.amount, 0),
-        donors: new Set(data.map(d => d.donorEmail).filter(Boolean)).size,
+        total: data.reduce((s, d) => s + Number(d.amount), 0),
+        confirmed: confirmed.reduce((s, d) => s + Number(d.amount), 0),
+        donors: Array.from(new Set(data.map(d => d.donorEmail).filter(Boolean))).length,
       });
     }).catch(() => {});
-  }, []);
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  const updateStatus = async (id: number, status: string) => {
+    try {
+      await api.put(`/api/donations/${id}`, { status });
+      toast.success(status === 'CONFIRMED' ? 'Don confirmé' : 'Don annulé');
+      fetchData();
+    } catch { toast.error('Erreur'); }
+  };
 
   const statusColor = (s: string) => {
     if (s === 'CONFIRMED') return 'bg-green-100 text-green-800';
     if (s === 'PENDING') return 'bg-amber-100 text-amber-800';
     return 'bg-red-100 text-red-800';
+  };
+
+  const methodLabel = (m: string) => {
+    const map: Record<string, string> = { AIRTEL_MONEY: 'Airtel Money', MOOV_MONEY: 'Moov Money', BANK_TRANSFER: 'Virement', CASH: 'Espèces', PAYPAL: 'PayPal', OTHER: 'Autre' };
+    return map[m] || m;
   };
 
   return (
@@ -77,6 +94,7 @@ export default function AdminDonsPage() {
                   <th className="px-5 py-3 text-left">Méthode</th>
                   <th className="px-5 py-3 text-left">Statut</th>
                   <th className="px-5 py-3 text-left">Date</th>
+                  <th className="px-5 py-3 text-left">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -85,15 +103,32 @@ export default function AdminDonsPage() {
                     <td className="px-5 py-3">
                       <p className="font-medium text-gray-900">{d.isAnonymous ? 'Anonyme' : (d.donorName || 'Inconnu')}</p>
                       {d.donorEmail && !d.isAnonymous && <p className="text-xs text-gray-400">{d.donorEmail}</p>}
+                      {d.donorPhone && (
+                        <p className="text-xs text-gray-400 flex items-center gap-1"><Phone className="h-3 w-3" />{d.donorPhone}</p>
+                      )}
                     </td>
-                    <td className="px-5 py-3 font-semibold text-gray-900">{formatXOF(d.amount)}</td>
-                    <td className="px-5 py-3 text-gray-500">{d.paymentMethod}</td>
+                    <td className="px-5 py-3 font-semibold text-gray-900">{formatXOF(Number(d.amount))}</td>
+                    <td className="px-5 py-3 text-gray-500">{methodLabel(d.paymentMethod)}</td>
                     <td className="px-5 py-3">
                       <Badge className={`border-0 text-[10px] ${statusColor(d.status)}`}>
-                        {d.status === 'CONFIRMED' ? 'Confirmé' : d.status === 'PENDING' ? 'En attente' : 'Échoué'}
+                        {d.status === 'CONFIRMED' ? 'Confirmé' : d.status === 'PENDING' ? 'En attente' : 'Annulé'}
                       </Badge>
                     </td>
                     <td className="px-5 py-3 text-gray-400">{new Date(d.createdAt).toLocaleDateString('fr-FR')}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex gap-1.5">
+                        {d.status !== 'CONFIRMED' && (
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1 text-green-600 hover:bg-green-50" onClick={() => updateStatus(d.id, 'CONFIRMED')}>
+                            <CheckCircle className="h-3.5 w-3.5" /> Confirmer
+                          </Button>
+                        )}
+                        {d.status !== 'CANCELLED' && (
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1 text-red-500 hover:bg-red-50" onClick={() => updateStatus(d.id, 'CANCELLED')}>
+                            <XCircle className="h-3.5 w-3.5" /> Annuler
+                          </Button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

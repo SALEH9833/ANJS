@@ -8,7 +8,8 @@ const router = Router();
 const donationSchema = z.object({
   donorName: z.string().trim().max(100).optional().nullable(),
   donorEmail: z.string().email().max(120).optional().nullable(),
-  amount: z.number().positive().max(100000),
+  donorPhone: z.string().trim().max(30).optional().nullable(),
+  amount: z.number().positive().max(10000000),
   paymentMethod: z.enum(['CASH', 'BANK_TRANSFER', 'AIRTEL_MONEY', 'MOOV_MONEY', 'PAYPAL', 'OTHER']).default('OTHER'),
   status: z.enum(['PENDING', 'CONFIRMED', 'CANCELLED']).default('PENDING'),
   isAnonymous: z.boolean().default(false),

@@ -125,6 +125,7 @@ export interface Donation {
   id: number;
   donorName: string | null;
   donorEmail: string | null;
+  donorPhone: string | null;
   amount: number;
   paymentMethod: string;
   status: string;

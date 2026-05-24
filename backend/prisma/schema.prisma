@@ -160,13 +160,14 @@ model AidRequest {
 // ============================================================================
 model Donation {
   id                       Int      @id @default(autoincrement())
-  donorName                String   @map("donor_name")
-  donorEmail               String?  @map("donor_email") // privé
+  donorName                String?  @map("donor_name")
+  donorEmail               String?  @map("donor_email")
+  donorPhone               String?  @map("donor_phone")
   amount                   Decimal  @db.Decimal(10, 2)
-  currency                 String   @default("EUR")
-  paymentMethod            String   @map("payment_method") // paypal | cash | transfer | other
+  currency                 String   @default("XOF")
+  paymentMethod            String   @map("payment_method")
   transactionId            String?  @map("transaction_id")
-  status                   String   @default("pending") // pending | completed | failed | refunded
+  status                   String   @default("PENDING")
   isAnonymous              Boolean  @default(false) @map("is_anonymous")
   message                  String?
   dedicatedToAidRequestId  Int?     @map("dedicated_to_aid_request_id")
