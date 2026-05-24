@@ -1,0 +1,262 @@
+// ANJS — Database schema
+// Run: npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// AUTH (admin only)
+// ============================================================================
+model AdminUser {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  email        String?
+  lastLogin    DateTime? @map("last_login")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("admin_users")
+}
+
+// ============================================================================
+// MEMBERS (core team / bureau members)
+// ============================================================================
+model Member {
+  id        Int      @id @default(autoincrement())
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  role      String
+  email     String?
+  phone     String?
+  photoUrl  String?  @map("photo_url")
+  bio       String?
+  order     Int      @default(0)
+  isActive  Boolean  @default(true) @map("is_active")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("members")
+}
+
+// ============================================================================
+// VOLUNTEERS (Terminale students helping out)
+// ============================================================================
+model Volunteer {
+  id            Int       @id @default(autoincrement())
+  firstName     String    @map("first_name")
+  lastName      String    @map("last_name")
+  email         String?   @unique
+  phone         String?
+  photoUrl      String?   @map("photo_url")
+  birthDate     DateTime? @map("birth_date") @db.Date
+  bio           String?
+  status        String    @default("active") // active | inactive
+  joinedAt      DateTime  @default(now()) @map("joined_at")
+  schoolId      Int?      @map("school_id")
+  school        School?   @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  aidRequests   AidRequest[] @relation("AssignedVolunteer")
+  beneficiaries Beneficiary[] @relation("AddedByVolunteer")
+
+  @@index([schoolId])
+  @@map("volunteers")
+}
+
+// ============================================================================
+// SCHOOLS (partner schools)
+// ============================================================================
+model School {
+  id                  Int      @id @default(autoincrement())
+  name                String
+  address             String?
+  city                String?
+  contactName         String?  @map("contact_name")
+  contactEmail        String?  @map("contact_email")
+  contactPhone        String?  @map("contact_phone")
+  logoUrl             String?  @map("logo_url")
+  coverImageUrl       String?  @map("cover_image_url")
+  description         String?
+  signedPartnershipAt DateTime? @map("signed_partnership_at") @db.Date
+  status              String   @default("active")
+  createdAt           DateTime @default(now()) @map("created_at")
+  volunteers          Volunteer[]
+
+  @@map("schools")
+}
+
+// ============================================================================
+// PARTNER ASSOCIATIONS
+// ============================================================================
+model PartnerAssociation {
+  id                    Int      @id @default(autoincrement())
+  name                  String
+  logoUrl               String?  @map("logo_url")
+  coverImageUrl         String?  @map("cover_image_url")
+  website               String?
+  email                 String?
+  phone                 String?
+  city                  String?
+  description           String?
+  partnershipStartedAt  DateTime? @map("partnership_started_at") @db.Date
+  status                String   @default("active")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  @@map("partner_associations")
+}
+
+// ============================================================================
+// BENEFICIARIES (people in need)
+// ============================================================================
+model Beneficiary {
+  id                     Int      @id @default(autoincrement())
+  fullName               String   @map("full_name")
+  age                    Int?
+  address                String?
+  city                   String?
+  phone                  String?
+  photoUrl               String?  @map("photo_url")
+  householdSize          Int?     @map("household_size")
+  needsSummary           String?  @map("needs_summary")
+  status                 String   @default("active") // pending | active | closed
+  addedByVolunteerId     Int?     @map("added_by_volunteer_id")
+  addedByVolunteer       Volunteer? @relation("AddedByVolunteer", fields: [addedByVolunteerId], references: [id], onDelete: SetNull)
+  aidRequests            AidRequest[]
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  @@map("beneficiaries")
+}
+
+// ============================================================================
+// AID REQUESTS
+// ============================================================================
+model AidRequest {
+  id              Int      @id @default(autoincrement())
+  beneficiaryId   Int      @map("beneficiary_id")
+  beneficiary     Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  category        String   // food | clothing | school | health | shelter | other
+  title           String
+  description     String
+  urgency         String   @default("medium") // low | medium | high
+  status          String   @default("open")   // open | in_progress | completed
+  volunteerId     Int?     @map("volunteer_id")
+  volunteer       Volunteer? @relation("AssignedVolunteer", fields: [volunteerId], references: [id], onDelete: SetNull)
+  imageUrl        String?  @map("image_url")
+  createdAt       DateTime @default(now()) @map("created_at")
+  completedAt     DateTime? @map("completed_at")
+  donations       Donation[]
+
+  @@index([status])
+  @@index([urgency])
+  @@map("aid_requests")
+}
+
+// ============================================================================
+// DONATIONS
+// ============================================================================
+model Donation {
+  id                       Int      @id @default(autoincrement())
+  donorName                String   @map("donor_name")
+  donorEmail               String?  @map("donor_email") // privé
+  amount                   Decimal  @db.Decimal(10, 2)
+  currency                 String   @default("EUR")
+  paymentMethod            String   @map("payment_method") // paypal | cash | transfer | other
+  transactionId            String?  @map("transaction_id")
+  status                   String   @default("pending") // pending | completed | failed | refunded
+  isAnonymous              Boolean  @default(false) @map("is_anonymous")
+  message                  String?
+  dedicatedToAidRequestId  Int?     @map("dedicated_to_aid_request_id")
+  dedicatedToAidRequest    AidRequest? @relation(fields: [dedicatedToAidRequestId], references: [id], onDelete: SetNull)
+  createdAt                DateTime @default(now()) @map("created_at")
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("donations")
+}
+
+// ============================================================================
+// EVENTS
+// ============================================================================
+model Event {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  imageUrl    String?  @map("image_url")
+  startDate   DateTime @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  location    String?
+  status      String   @default("planned") // planned | ongoing | finished
+  aidCount    Int      @default(0) @map("aid_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("events")
+}
+
+// ============================================================================
+// NEWS ARTICLES
+// ============================================================================
+model NewsArticle {
+  id            Int      @id @default(autoincrement())
+  slug          String   @unique
+  title         String
+  excerpt       String?
+  content       String   // Markdown
+  coverImageUrl String?  @map("cover_image_url")
+  publishedAt   DateTime? @map("published_at")
+  isFeatured    Boolean  @default(false) @map("is_featured")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("news_articles")
+}
+
+// ============================================================================
+// MEDIA LIBRARY (admin uploads)
+// ============================================================================
+model MediaAsset {
+  id         Int      @id @default(autoincrement())
+  filename   String
+  url        String
+  altText    String?  @map("alt_text")
+  category   String   @default("general") // hero | event | beneficiary | school | general
+  sizeBytes  Int?     @map("size_bytes")
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  @@map("media_assets")
+}
+
+// ============================================================================
+// CONTACT MESSAGES (visitor inquiries)
+// ============================================================================
+model ContactMessage {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String
+  subject   String?
+  message   String
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([isRead])
+  @@map("contact_messages")
+}
+
+// ============================================================================
+// SITE CONTENT (dynamic key-value content for all pages)
+// ============================================================================
+model SiteContent {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  type      String   @default("text")
+  group     String   @default("general")
+  label     String?
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([group])
+  @@map("site_content")
+}
