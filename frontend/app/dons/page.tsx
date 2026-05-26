@@ -5,35 +5,26 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Heart, CheckCircle, HandHeart, Users, GraduationCap, Smartphone, CreditCard, Banknote, ArrowRight } from 'lucide-react';
+import { Heart, CheckCircle, HandHeart, GraduationCap, MessageCircle, ArrowRight, Phone, Shield } from 'lucide-react';
 import { toast } from 'sonner';
-import api from '@/lib/api';
 import FadeIn from '@/components/animations/FadeIn';
 import StaggerChildren, { StaggerItem } from '@/components/animations/StaggerChildren';
 import Counter from '@/components/animations/Counter';
 
 const AMOUNTS = [1000, 2500, 5000, 10000, 25000, 50000];
-
-const PAYMENT_METHODS = [
-  { id: 'AIRTEL_MONEY', label: 'Airtel Money', icon: Smartphone, color: 'text-red-600', bg: 'bg-red-50', number: '' },
-  { id: 'MOOV_MONEY', label: 'Moov Money', icon: Smartphone, color: 'text-blue-600', bg: 'bg-blue-50', number: '' },
-  { id: 'BANK_TRANSFER', label: 'Virement bancaire', icon: Banknote, color: 'text-emerald-600', bg: 'bg-emerald-50', number: '' },
-  { id: 'OTHER', label: 'Autre', icon: CreditCard, color: 'text-gray-600', bg: 'bg-gray-50', number: '' },
-];
+const WHATSAPP_NUMBER = '23560935774';
 
 export default function DonsPage() {
   const [step, setStep] = useState(1);
   const [amount, setAmount] = useState(5000);
   const [customAmount, setCustomAmount] = useState('');
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [anonymous, setAnonymous] = useState(false);
-  const [method, setMethod] = useState('AIRTEL_MONEY');
-  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
   const [done, setDone] = useState(false);
   const [stats, setStats] = useState({ donors: 0, amount: 0 });
   const [c, setC] = useState<Record<string, string>>({});
@@ -47,25 +38,27 @@ export default function DonsPage() {
       .then(r => r.json()).then(d => { if (d.data) setStats(d.data); }).catch(() => {});
   }, []);
 
-  const handleSubmit = async () => {
-    if (!finalAmount || finalAmount < 100) { toast.error('Montant minimum : 100 FCFA'); return; }
-    setLoading(true);
-    try {
-      await api.post('/api/donations', {
-        donorName: anonymous ? null : name,
-        donorEmail: anonymous ? null : email,
-        donorPhone: phone || null,
-        amount: finalAmount,
-        paymentMethod: method,
-        isAnonymous: anonymous,
-      });
-      setDone(true);
-      toast.success('Merci pour votre don !');
-    } catch { toast.error('Erreur. Réessayez.'); }
-    finally { setLoading(false); }
+  const buildWhatsAppUrl = () => {
+    const lines = [
+      `Bonjour ANJS,`,
+      ``,
+      `Je souhaite faire un don de *${finalAmount.toLocaleString('fr-FR')} FCFA*.`,
+      ``,
+    ];
+    if (name) lines.push(`Nom : ${name}`);
+    if (phone) lines.push(`Téléphone : ${phone}`);
+    if (message) { lines.push(``); lines.push(`Message : ${message}`); }
+    lines.push(``);
+    lines.push(`Merci de me communiquer les modalités de paiement.`);
+    const text = encodeURIComponent(lines.join('\n'));
+    return `https://wa.me/${WHATSAPP_NUMBER}?text=${text}`;
   };
 
-  const selectedMethod = PAYMENT_METHODS.find(m => m.id === method);
+  const handleSend = () => {
+    if (!finalAmount || finalAmount < 100) { toast.error('Montant minimum : 100 FCFA'); return; }
+    window.open(buildWhatsAppUrl(), '_blank');
+    setDone(true);
+  };
 
   if (done) {
     return (
@@ -79,24 +72,24 @@ export default function DonsPage() {
             </motion.div>
             <h1 className="text-3xl font-extrabold text-emerald-900 mb-3">Merci pour votre générosité !</h1>
             <p className="text-lg text-emerald-700/70 mb-6">
-              Votre don de <span className="font-bold text-emerald-800">{finalAmount.toLocaleString('fr-FR')} FCFA</span> a été enregistré avec succès.
+              Votre intention de don de <span className="font-bold text-emerald-800">{finalAmount.toLocaleString('fr-FR')} FCFA</span> a bien été transmise via WhatsApp.
             </p>
-            {method !== 'OTHER' && (
-              <Card className="border-emerald-200 bg-emerald-50/50 mb-6">
-                <CardContent className="p-5 text-left">
-                  <p className="font-semibold text-emerald-800 mb-2">Prochaine étape :</p>
-                  <p className="text-sm text-emerald-700/70">
-                    {method === 'BANK_TRANSFER'
-                      ? 'Effectuez le virement bancaire avec la référence de votre don. Un membre vous contactera pour confirmer la réception.'
-                      : `Envoyez ${finalAmount.toLocaleString('fr-FR')} FCFA via ${selectedMethod?.label}. Un membre de l'équipe confirmera votre don.`
-                    }
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-            <Button onClick={() => { setDone(false); setStep(1); setCustomAmount(''); }} variant="outline" className="gap-2">
-              Faire un autre don <ArrowRight className="h-4 w-4" />
-            </Button>
+            <Card className="border-emerald-200 bg-emerald-50/50 mb-6">
+              <CardContent className="p-5 text-left">
+                <p className="font-semibold text-emerald-800 mb-2">Prochaine étape :</p>
+                <p className="text-sm text-emerald-700/70">
+                  Un membre de l&apos;équipe ANJS vous répondra sur WhatsApp avec les modalités de paiement. Vous pourrez convenir ensemble du mode de transfert le plus pratique.
+                </p>
+              </CardContent>
+            </Card>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => { setDone(false); setStep(1); setCustomAmount(''); setName(''); setPhone(''); setMessage(''); }} variant="outline" className="gap-2">
+                Faire un autre don <ArrowRight className="h-4 w-4" />
+              </Button>
+              <Button onClick={() => window.open(buildWhatsAppUrl(), '_blank')} className="gap-2 bg-green-600 hover:bg-green-700">
+                <MessageCircle className="h-4 w-4" /> Renvoyer sur WhatsApp
+              </Button>
+            </div>
           </div>
         </FadeIn>
       </div>
@@ -147,7 +140,7 @@ export default function DonsPage() {
           <StaggerChildren className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16" staggerDelay={0.1}>
             {[
               { icon: HandHeart, title: 'Aide directe', desc: '100% de vos dons vont aux bénéficiaires', bg: 'bg-emerald-50', color: 'text-emerald-600' },
-              { icon: Users, title: 'Transparence', desc: 'Suivi complet de l\'utilisation des fonds', bg: 'bg-blue-50', color: 'text-blue-600' },
+              { icon: Shield, title: 'Sécurisé', desc: 'Contact direct via WhatsApp, aucune donnée bancaire en ligne', bg: 'bg-blue-50', color: 'text-blue-600' },
               { icon: GraduationCap, title: 'Impact local', desc: 'Des jeunes qui changent leur communauté', bg: 'bg-amber-50', color: 'text-amber-600' },
             ].map((v) => (
               <StaggerItem key={v.title}>
@@ -173,11 +166,11 @@ export default function DonsPage() {
                   <Heart className="h-6 w-6" />
                   <div>
                     <h2 className="font-bold text-lg">Formulaire de don</h2>
-                    <p className="text-sm text-white/70">Étape {step}/3</p>
+                    <p className="text-sm text-white/70">Étape {step}/2</p>
                   </div>
                 </div>
                 <div className="flex gap-1 mt-4">
-                  {[1, 2, 3].map((s) => (
+                  {[1, 2].map((s) => (
                     <div key={s} className={`h-1 flex-1 rounded-full ${s <= step ? 'bg-white' : 'bg-white/30'} transition-colors`} />
                   ))}
                 </div>
@@ -221,53 +214,21 @@ export default function DonsPage() {
 
                 {step === 2 && (
                   <div className="space-y-5">
-                    <div className="flex items-center gap-2 mb-2">
-                      <input type="checkbox" id="anonymous" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} className="rounded border-gray-300" />
-                      <Label htmlFor="anonymous" className="text-sm cursor-pointer">Don anonyme</Label>
-                    </div>
-                    {!anonymous && (
-                      <div className="space-y-4">
-                        <div className="space-y-1.5">
-                          <Label className="text-sm font-medium">Votre nom</Label>
-                          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Ahmed Moussa" className="h-11" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-sm font-medium">Email</Label>
-                          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ahmed@email.com" className="h-11" />
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">Votre nom (optionnel)</Label>
+                        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Ahmed Moussa" className="h-11" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">Votre téléphone (optionnel)</Label>
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-gray-400" />
+                          <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+235 XX XX XX XX" className="h-11" />
                         </div>
                       </div>
-                    )}
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-medium">Téléphone (pour confirmation)</Label>
-                      <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+235 XX XX XX XX" className="h-11" />
-                    </div>
-                    <div className="flex gap-3">
-                      <Button variant="outline" onClick={() => setStep(1)} className="flex-1 h-11">Retour</Button>
-                      <Button onClick={() => setStep(3)} className="flex-1 h-11 bg-emerald-600 hover:bg-emerald-700 gap-2">
-                        Continuer <ArrowRight className="h-5 w-5" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {step === 3 && (
-                  <div className="space-y-5">
-                    <div>
-                      <Label className="text-sm font-semibold mb-3 block">Mode de paiement</Label>
-                      <div className="grid grid-cols-2 gap-3">
-                        {PAYMENT_METHODS.map((m) => (
-                          <button
-                            key={m.id}
-                            type="button"
-                            onClick={() => setMethod(m.id)}
-                            className={`p-4 rounded-xl border-2 text-left transition-all ${
-                              method === m.id ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 hover:border-emerald-300'
-                            }`}
-                          >
-                            <m.icon className={`h-6 w-6 ${m.color} mb-2`} />
-                            <p className="font-semibold text-sm">{m.label}</p>
-                          </button>
-                        ))}
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">Message (optionnel)</Label>
+                        <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Un mot pour accompagner votre don..." rows={3} />
                       </div>
                     </div>
 
@@ -280,10 +241,10 @@ export default function DonsPage() {
                             <span className="font-bold text-gray-900">{finalAmount.toLocaleString('fr-FR')} FCFA</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-500">Paiement</span>
-                            <span className="text-gray-700">{selectedMethod?.label}</span>
+                            <span className="text-gray-500">Contact</span>
+                            <span className="text-gray-700 flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5 text-green-600" /> WhatsApp</span>
                           </div>
-                          {!anonymous && name && (
+                          {name && (
                             <div className="flex justify-between">
                               <span className="text-gray-500">Donateur</span>
                               <span className="text-gray-700">{name}</span>
@@ -293,17 +254,44 @@ export default function DonsPage() {
                       </CardContent>
                     </Card>
 
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                      <div className="flex items-start gap-3">
+                        <MessageCircle className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-green-800">Contact sécurisé via WhatsApp</p>
+                          <p className="text-xs text-green-600 mt-1">
+                            En cliquant sur le bouton, vous serez redirigé vers WhatsApp avec un message pré-rempli. Un membre de l&apos;équipe vous répondra pour organiser le transfert.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="flex gap-3">
-                      <Button variant="outline" onClick={() => setStep(2)} className="flex-1 h-12">Retour</Button>
-                      <Button onClick={handleSubmit} disabled={loading} className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-base font-semibold gap-2">
-                        <Heart className="h-5 w-5" />
-                        {loading ? 'Envoi...' : 'Confirmer le don'}
+                      <Button variant="outline" onClick={() => setStep(1)} className="flex-1 h-12">Retour</Button>
+                      <Button onClick={handleSend} className="flex-1 h-12 bg-green-600 hover:bg-green-700 text-base font-semibold gap-2">
+                        <MessageCircle className="h-5 w-5" />
+                        Contacter via WhatsApp
                       </Button>
                     </div>
                   </div>
                 )}
               </CardContent>
             </Card>
+          </FadeIn>
+
+          <FadeIn>
+            <div className="mt-12 text-center">
+              <p className="text-sm text-muted-foreground mb-2">Vous pouvez aussi nous contacter directement</p>
+              <a
+                href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent('Bonjour ANJS, je souhaite faire un don.')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-green-600 hover:text-green-700 font-medium transition-colors"
+              >
+                <MessageCircle className="h-5 w-5" />
+                +235 60 93 57 74
+              </a>
+            </div>
           </FadeIn>
         </div>
       </section>
